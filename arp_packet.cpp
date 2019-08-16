@@ -1,5 +1,5 @@
 #pragma once
-#include "arp_packet.h"
+#include "stdafx.h"
 
 arp_packet::arp_packet() {
     u_char dest[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
@@ -29,19 +29,23 @@ arp_packet::arp_packet() {
     memcpy(this->data.arp.dstIP, tpa, 4);
 }
 
-int arp_packet::isARP(const uint8_t* pck){
-    if((pck[12] == 0x08) && (pck[13] == 0x06))
-        return 1;
-    else
-        return 0;
+arp_packet::~arp_packet() {
+
 }
 
-int arp_packet::isRep(const uint8_t *pck) {
-    char OpIsRep = (pck[20]==0x00 && pck[21]==0x02);
-    if(OpIsRep){
-        return 1;
-    }
-    return 0;
+int arp_packet::isARP(){
+    return (this->data.eth.Type[0] == 0x08
+        && this->data.eth.Type[1] == 0x06);
+}
+
+int arp_packet::isRep() {
+    return (this->data.arp.opcode[0] == 0x00
+        && this->data.arp.opcode[1] == 0x02);
+}
+
+int arp_packet::isReq() {
+    return (this->data.arp.opcode[0] == 0x00
+            && this->data.arp.opcode[1] == 0x01);
 }
 
 u_char* arp_packet::getDstMac() {
