@@ -44,5 +44,7 @@ public:
     void modifyOP(int value);
     void modifyETHDestination(u_char value[]);
     void modifyETHSource(u_char value[]);
+    void initPacket(u_char value[]);
 
     };
+

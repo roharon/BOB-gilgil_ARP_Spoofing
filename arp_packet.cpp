@@ -1,4 +1,3 @@
-#pragma once
 #include "stdafx.h"
 
 arp_packet::arp_packet() {
@@ -108,4 +107,8 @@ void arp_packet::modifyETHSource(u_char *value) {
     for(int i =0; i<MAC_SIZE; i++){
         this->data.eth.source[i] = value[i];
     }
+}
+
+void arp_packet::initPacket(u_char *value) {
+    memcpy(&this->data, value, ARP_PCK_SIZE);
 }

