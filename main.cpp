@@ -103,8 +103,6 @@ int main(int argc, char *argv[]) {
         if(pcap_next_ex(handle, &header, &packet)==0){
             continue;
         }
-
-        //TODO packet을 rec_pck에 넣을 수 있게 함수구현해야할 것
         rec_pck.initPacket((u_char*)packet);
         if(isARP(packet) && isRep(packet)){
             printf("Caught ARP-Reply packet\n");
