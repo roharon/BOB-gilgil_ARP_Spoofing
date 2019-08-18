@@ -165,8 +165,6 @@ int main(int argc, char *argv[]) {
         rec_pck.modifyTargetMAC(GateWayMac);
 
         pcap_sendpacket(handle, (const u_char*) &(rec_pck.data), sizeof(packet));
-
-
         printf("\n---패킷보냄---\n");
 
 
