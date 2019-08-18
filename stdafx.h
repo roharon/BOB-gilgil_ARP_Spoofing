@@ -13,6 +13,7 @@
 #include <stdint-gcc.h>
 #include "arp_packet.h"
 
+#include <pthread.h>
 #define true 1
 #define false 0
 
@@ -22,5 +23,8 @@
 #define ARP_PCK_SIZE 42
 #define ARP_REQUEST 0x0001
 #define ARP_REPLY 0x0002
-#define ARP_SIZE 42
 
+typedef struct{
+    char sender_ip[4];
+    char gateway_ip[4];
+}thread_args;

