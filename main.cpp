@@ -9,10 +9,8 @@ int getMyMac(u_char* myMac, char* _interface){
 
     strcpy(s.ifr_name, _interface);
     if(!ioctl(fd, SIOCGIFHWADDR, &s)){
-        // printf("\n");
         for(int i =0; i<6; i++){
             myMac[i] = s.ifr_addr.sa_data[i];
-            // printf("%x ", myMac[i]);
         }
     }
     return 1;
@@ -53,21 +51,9 @@ void* spoof(void *thr_ptr){
 
     //TODO sender ~~ 이 둘에다가 구조체 값 넣어줘야함
 
-    for(int i = 0; i<IP_SIZE; i++){
-        printf("%d.", sender_ip[i]);
-    }
     printf("\n");
-    for(int i = 0; i<IP_SIZE; i++){
-        printf("%d.", gateway_ip[i]);
-    }
-    printf("\n\n\n");
+    printf("%d.%d.%d.%d\n", sender_ip[0],sender_ip[1],sender_ip[2],sender_ip[3]);
 
-    const u_char* ucp_DATA;
-    pcap_t *stp_NIC;
-    // char* interface = argv[1];
-    //char* sender_ip = argv[2];
-    //char gateway_ip[] = {192,168,43,1};
-    //char* gateway_ip = argv[2];
     char errbuf[PCAP_ERRBUF_SIZE];
 
     pcap_t* handle = pcap_open_live(interface, BUFSIZ, 1, 1000, errbuf);
@@ -79,7 +65,6 @@ void* spoof(void *thr_ptr){
     struct pcap_pkthdr* header;
     const uint8_t* packet;
     u_char SenderMAC[6];
-    printf("!!!\n");
 
     u_char DstMAC[6];
     u_char GateWayMac[6];
@@ -163,7 +148,7 @@ int main(int argc, char *argv[]) {
     int rc;
     u_char sender_ip[4];
     u_char gateway_ip[4];
-    thread_args THREAD_ARG;
+
 
     interface = argv[1];
     if (argc < 4) {
@@ -178,41 +163,38 @@ int main(int argc, char *argv[]) {
 
     getMyMac(myMac, argv[1]);
 
-    printf("----\n");
+    thread_args THREAD_ARG[NUM_THREADS];
     printf("NUM_THREADS : %d\n",NUM_THREADS);
     for(int i =1; i<=NUM_THREADS; i++){
+
         // 23 45 67 89
-        printf("-----%d\n", i);
+        printf("-----THREAD %d -----\n", i);
         char *temp;
+
         temp = strtok(argv[i*2], ".");
         sender_ip[0] = atoi(temp);
-        for (int i = 1; i < IP_SIZE; i++) {
-            printf("===========\n");
-            sender_ip[i] = atoi(strtok(NULL, "."));
+        for (int j = 1; j < IP_SIZE; j++) {
+            sender_ip[j] = atoi(strtok(NULL, "."));
         }
+
 
         temp = strtok(argv[i*2+1], ".");
         gateway_ip[0] = atoi(temp);
-        for (int i = 1; i < IP_SIZE; i++) {
-            gateway_ip[i] = atoi(strtok(NULL, "."));
+        for (int j = 1; j < IP_SIZE; j++) {
+            gateway_ip[j] = atoi(strtok(NULL, "."));
         }
         printf("\n");
 
-        memcpy(THREAD_ARG.sender_ip, sender_ip, IP_SIZE);
-        memcpy(THREAD_ARG.gateway_ip, gateway_ip, IP_SIZE);
+        memcpy(THREAD_ARG[i-1].sender_ip, sender_ip, IP_SIZE);
+        memcpy(THREAD_ARG[i-1].gateway_ip, gateway_ip, IP_SIZE);
 
-        rc = pthread_create(&threads[i-1], NULL, spoof, (void*)&THREAD_ARG);
+        rc = pthread_create(&threads[i-1], NULL, spoof, (void*)&THREAD_ARG[i-1]);
 
-        for(int i =0; i<IP_SIZE; i++){
-            printf("%d.",sender_ip[i]);
-        }
-        printf("\n");
         // 인덱스가 1부터 시작하므로 i-1로 넣음
         if(rc){
             printf("Error: unable to create thread\n");
         }
     }
-
     for(int i = 0; i<NUM_THREADS; i++)
         pthread_join(threads[i], NULL);
         //스레드 종료전까지 대기.(프로그램 종료를 방지함)
