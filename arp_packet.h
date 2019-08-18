@@ -37,6 +37,8 @@ public:
     int isReq();
     u_char* getDstMac();
     u_char* getSendMac();
+    u_char* getSendIP();
+    u_char* getDstIP();
     void modifyTargetMAC(u_char value[]);
     void modifySenderMAC(u_char value[]);
     void modifyTargetIP(u_char value[]);

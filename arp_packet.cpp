@@ -55,6 +55,14 @@ u_char* arp_packet::getSendMac() {
     return this->data.eth.source;
 }
 
+u_char* arp_packet::getDstIP() {
+    return this->data.arp.dstIP;
+}
+
+u_char* arp_packet::getSendIP() {
+    return this->data.arp.srcIP;
+}
+
 void arp_packet::modifyTargetMAC(u_char *value) {
     for(int i = 0; i<MAC_SIZE; i++)
     {
